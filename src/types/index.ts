@@ -1,59 +1,52 @@
-export interface Dependency {
+export type UpdateType = 'major' | 'minor' | 'patch' | 'none';
+
+export type BreakingChangeSeverity = 'high' | 'medium' | 'low';
+
+export type BreakingChangeType = 'api' | 'behavior' | 'dependency' | 'config' | 'other';
+
+export interface BreakingChange {
+  type: BreakingChangeType;
+  description: string;
+  severity: BreakingChangeSeverity;
+}
+
+export interface ParsedPackage {
   name: string;
   version: string;
   isDev: boolean;
-  isOptional?: boolean;
 }
 
-export interface PackageJson {
-  name: string;
-  version: string;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
+export interface DependencyAnalysis {
+  packageName: string;
+  currentVersion: string;
+  latestVersion: string;
+  updateType: UpdateType;
+  changelogUrl?: string;
 }
 
-export interface BreakingChange {
-  version: string;
-  description: string;
-  severity: 'high' | 'medium' | 'low';
-  affectedApis?: string[];
+export interface DependencyReport {
+  packageName: string;
+  currentVersion: string;
+  latestVersion: string;
+  updateType: UpdateType;
+  breakingChanges: BreakingChange[];
+  recommendation: string;
+}
+
+export interface ImpactScore {
+  score: number;
+  factors: string[];
 }
 
 export interface ChangelogEntry {
   version: string;
   date?: string;
-  changes: string[];
-  breakingChanges: BreakingChange[];
-}
-
-export interface UpdateInfo {
-  isOutdated: boolean;
-  latestVersion: string;
-  updateType?: 'major' | 'minor' | 'patch';
-}
-
-export interface DependencyAnalysis {
-  dependency: Dependency;
-  changelog: ChangelogEntry[];
-  breakingChanges: BreakingChange[];
-  impactScore: number;
-  recommendation: string;
-  updateInfo?: UpdateInfo;
-}
-
-export interface Report {
-  generatedAt: string;
-  totalDependencies: number;
-  outdatedCount: number;
-  breakingChangesCount: number;
-  highImpactCount: number;
-  analyses: DependencyAnalysis[];
+  body: string;
 }
 
 export interface StackledConfig {
-  packageJsonPath: string;
-  includeDevDependencies: boolean;
-  minImpactScore: number;
-  outputFormat: 'json' | 'table' | 'markdown';
+  ignore?: string[];
+  includeDev?: boolean;
+  minImpactScore?: number;
+  outputFormat?: 'text' | 'json';
 }
