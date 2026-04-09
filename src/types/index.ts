@@ -8,58 +8,59 @@ export interface PackageJson {
 
 export interface DependencyInfo {
   name: string;
-  version: string;
   currentVersion: string;
-  latestVersion: string;
-  repository?: string;
-  homepage?: string;
+  latestVersion?: string;
+  type: 'dependencies' | 'devDependencies' | 'peerDependencies';
 }
 
 export interface DependencyUpdate {
-  name: string;
+  packageName: string;
   currentVersion: string;
   latestVersion: string;
   updateType: 'major' | 'minor' | 'patch';
-  breaking: boolean;
-}
-
-export interface AnalysisResult {
-  totalDependencies: number;
-  outdatedDependencies: number;
-  breakingChanges: number;
-  updates: DependencyUpdate[];
-}
-
-export interface BreakingChange {
-  packageName: string;
-  version: string;
-  description: string;
-  severity: 'high' | 'medium' | 'low';
-  affectedAPIs?: string[];
 }
 
 export interface ChangelogEntry {
   version: string;
-  date?: string;
-  changes: string[];
-  breaking: boolean;
+  content: string;
+  url?: string;
 }
 
-export interface StackledConfig {
-  include?: string[];
-  exclude?: string[];
-  breakingChangeThreshold?: 'major' | 'minor' | 'patch';
-  autofix?: boolean;
-  notifications?: {
-    email?: string;
-    slack?: string;
+export interface BreakingChange {
+  packageName: string;
+  fromVersion: string;
+  toVersion: string;
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  type: 'major-version' | 'changelog-indicated' | 'api-removal' | 'behavior-change' | 'deprecation';
+  affectedAPIs: string[];
+}
+
+export interface ImpactScore {
+  packageName: string;
+  score: number;
+  level: 'critical' | 'high' | 'medium' | 'low';
+  factors: string[];
+  recommendation: string;
+}
+
+export interface AnalysisReport {
+  timestamp: Date;
+  totalDependencies: number;
+  updatesAvailable: number;
+  breakingChanges: BreakingChange[];
+  impactScores: ImpactScore[];
+  summary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
   };
 }
 
-export type DependencyType = 'dependencies' | 'devDependencies' | 'peerDependencies';
-
-export interface ParsedDependency {
-  name: string;
-  version: string;
-  type: DependencyType;
+export interface StackledConfig {
+  packageJsonPath?: string;
+  ignoreDevDependencies?: boolean;
+  severityThreshold?: 'low' | 'medium' | 'high' | 'critical';
+  outputFormat?: 'json' | 'table' | 'markdown';
 }
