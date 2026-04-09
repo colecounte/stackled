@@ -1,0 +1,12 @@
+# Typescript
+
+node_modules/
+Desktop.ini
+dist/
+out/
+*.log
+build/
+Thumbs.db
+.env
+*.js.map
+coverage/
