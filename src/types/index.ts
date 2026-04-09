@@ -1,57 +1,56 @@
-export interface Dependency {
+export interface PackageJson {
+  name?: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+export interface DependencyInfo {
   name: string;
   currentVersion: string;
-  versionRange: string;
-  isDev: boolean;
-}
-
-export interface PackageMetadata {
-  name: string;
-  latestVersion: string;
-  versions: string[];
-  publishedAt?: Date;
-  description: string;
-  repositoryUrl?: string;
-  npmUrl: string;
-}
-
-export interface UpdateInfo {
-  dependency: Dependency;
-  metadata: PackageMetadata;
-  updateType: 'major' | 'minor' | 'patch' | 'none';
-  latestVersion: string;
+  latestVersion?: string;
+  type: 'dependencies' | 'devDependencies' | 'peerDependencies';
+  updateAvailable?: boolean;
+  updateType?: 'major' | 'minor' | 'patch' | 'none';
+  npmMetadata?: Record<string, unknown>;
 }
 
 export interface BreakingChange {
-  version: string;
+  packageName: string;
+  fromVersion: string;
+  toVersion: string;
   description: string;
-  severity: 'high' | 'medium' | 'low';
+  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export interface AnalysisResult {
-  dependency: Dependency;
-  updateInfo: UpdateInfo;
-  breakingChanges: BreakingChange[];
-  impactScore: number;
-  recommendation: string;
+export interface ImpactScore {
+  packageName: string;
+  score: number;
+  factors: string[];
+}
+
+export interface DeprecationWarning {
+  packageName: string;
+  currentVersion: string;
+  message: string;
+  successor?: string;
 }
 
 export interface Report {
-  generatedAt: Date;
-  projectName: string;
+  generatedAt: string;
   totalDependencies: number;
   outdatedCount: number;
-  criticalCount: number;
-  results: AnalysisResult[];
+  breakingChanges: BreakingChange[];
+  impactScores: ImpactScore[];
+  deprecations: DeprecationWarning[];
+  recommendations: string[];
 }
 
-export interface StackledConfig {
-  outputFormat: 'table' | 'json' | 'markdown';
-  includeDev: boolean;
-  severityThreshold: 'high' | 'medium' | 'low';
-  cacheEnabled: boolean;
-  cacheTtlMinutes: number;
+export interface Config {
+  outputFormat: 'json' | 'table' | 'markdown';
   ignorePackages: string[];
+  severityThreshold: 'low' | 'medium' | 'high' | 'critical';
+  checkDeprecations: boolean;
+  cacheTtlMinutes: number;
 }
-
-export type UpdateType = 'major' | 'minor' | 'patch' | 'none';
