@@ -1,58 +1,65 @@
-/**
- * Shared type definitions for stackled
- */
-
 export interface PackageJson {
   name: string;
   version: string;
-  description?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
-  scripts?: Record<string, string>;
-  [key: string]: any;
 }
 
-export interface DependencyHealth {
+export interface DependencyInfo {
+  name: string;
+  version: string;
+  currentVersion: string;
+  latestVersion: string;
+  repository?: string;
+  homepage?: string;
+}
+
+export interface DependencyUpdate {
   name: string;
   currentVersion: string;
-  latestVersion?: string;
-  isOutdated: boolean;
-  hasBreakingChanges: boolean;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  latestVersion: string;
+  updateType: 'major' | 'minor' | 'patch';
+  breaking: boolean;
+}
+
+export interface AnalysisResult {
+  totalDependencies: number;
+  outdatedDependencies: number;
+  breakingChanges: number;
+  updates: DependencyUpdate[];
 }
 
 export interface BreakingChange {
-  package: string;
-  fromVersion: string;
-  toVersion: string;
+  packageName: string;
+  version: string;
   description: string;
+  severity: 'high' | 'medium' | 'low';
   affectedAPIs?: string[];
-  migrationGuide?: string;
+}
+
+export interface ChangelogEntry {
+  version: string;
+  date?: string;
+  changes: string[];
+  breaking: boolean;
 }
 
 export interface StackledConfig {
-  projectPath: string;
-  includeDevDependencies: boolean;
-  ignoredPackages?: string[];
-  severityThreshold?: 'low' | 'medium' | 'high' | 'critical';
-  autoUpdate?: boolean;
-}
-
-export interface AnalysisReport {
-  timestamp: Date;
-  projectName: string;
-  totalDependencies: number;
-  outdatedDependencies: number;
-  breakingChanges: BreakingChange[];
-  healthScore: number;
-  recommendations: string[];
+  include?: string[];
+  exclude?: string[];
+  breakingChangeThreshold?: 'major' | 'minor' | 'patch';
+  autofix?: boolean;
+  notifications?: {
+    email?: string;
+    slack?: string;
+  };
 }
 
 export type DependencyType = 'dependencies' | 'devDependencies' | 'peerDependencies';
 
-export interface VersionRange {
-  raw: string;
-  operator?: '^' | '~' | '>=' | '<=' | '>' | '<' | '=';
+export interface ParsedDependency {
+  name: string;
   version: string;
+  type: DependencyType;
 }
