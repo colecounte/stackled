@@ -1,52 +1,57 @@
-export type UpdateType = 'major' | 'minor' | 'patch' | 'none';
-
-export type BreakingChangeSeverity = 'high' | 'medium' | 'low';
-
-export type BreakingChangeType = 'api' | 'behavior' | 'dependency' | 'config' | 'other';
-
-export interface BreakingChange {
-  type: BreakingChangeType;
-  description: string;
-  severity: BreakingChangeSeverity;
-}
-
-export interface ParsedPackage {
+export interface Dependency {
   name: string;
-  version: string;
+  currentVersion: string;
+  versionRange: string;
   isDev: boolean;
 }
 
-export interface DependencyAnalysis {
-  packageName: string;
-  currentVersion: string;
+export interface PackageMetadata {
+  name: string;
   latestVersion: string;
-  updateType: UpdateType;
-  changelogUrl?: string;
+  versions: string[];
+  publishedAt?: Date;
+  description: string;
+  repositoryUrl?: string;
+  npmUrl: string;
 }
 
-export interface DependencyReport {
-  packageName: string;
-  currentVersion: string;
+export interface UpdateInfo {
+  dependency: Dependency;
+  metadata: PackageMetadata;
+  updateType: 'major' | 'minor' | 'patch' | 'none';
   latestVersion: string;
-  updateType: UpdateType;
+}
+
+export interface BreakingChange {
+  version: string;
+  description: string;
+  severity: 'high' | 'medium' | 'low';
+}
+
+export interface AnalysisResult {
+  dependency: Dependency;
+  updateInfo: UpdateInfo;
   breakingChanges: BreakingChange[];
+  impactScore: number;
   recommendation: string;
 }
 
-export interface ImpactScore {
-  score: number;
-  factors: string[];
-}
-
-export interface ChangelogEntry {
-  version: string;
-  date?: string;
-  body: string;
+export interface Report {
+  generatedAt: Date;
+  projectName: string;
+  totalDependencies: number;
+  outdatedCount: number;
+  criticalCount: number;
+  results: AnalysisResult[];
 }
 
 export interface StackledConfig {
-  ignore?: string[];
-  includeDev?: boolean;
-  minImpactScore?: number;
-  outputFormat?: 'text' | 'json';
+  outputFormat: 'table' | 'json' | 'markdown';
+  includeDev: boolean;
+  severityThreshold: 'high' | 'medium' | 'low';
+  cacheEnabled: boolean;
+  cacheTtlMinutes: number;
+  ignorePackages: string[];
 }
+
+export type UpdateType = 'major' | 'minor' | 'patch' | 'none';
