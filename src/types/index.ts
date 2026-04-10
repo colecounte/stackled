@@ -1,19 +1,13 @@
-export interface PackageJson {
-  name?: string;
-  version?: string;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
-}
+export type UpdateType = 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
+export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
+export type OutputFormat = 'table' | 'json' | 'minimal';
 
-export interface DependencyInfo {
+export interface PackageInfo {
   name: string;
-  currentVersion: string;
+  version: string;
+  type: 'dependency' | 'devDependency' | 'peerDependency';
   latestVersion?: string;
-  type: 'dependencies' | 'devDependencies' | 'peerDependencies';
-  updateAvailable?: boolean;
-  updateType?: 'major' | 'minor' | 'patch' | 'none';
-  npmMetadata?: Record<string, unknown>;
+  updateType?: UpdateType;
 }
 
 export interface BreakingChange {
@@ -21,36 +15,44 @@ export interface BreakingChange {
   fromVersion: string;
   toVersion: string;
   description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'high' | 'medium' | 'low';
 }
 
 export interface ImpactScore {
   packageName: string;
   score: number;
-  factors: string[];
+  reasons: string[];
 }
 
-export interface DeprecationWarning {
-  packageName: string;
-  currentVersion: string;
-  message: string;
-  successor?: string;
-}
-
-export interface Report {
-  generatedAt: string;
-  totalDependencies: number;
-  outdatedCount: number;
+export interface DependencyReport {
+  packages: PackageInfo[];
   breakingChanges: BreakingChange[];
   impactScores: ImpactScore[];
-  deprecations: DeprecationWarning[];
-  recommendations: string[];
+  generatedAt: string;
 }
 
-export interface Config {
-  outputFormat: 'json' | 'table' | 'markdown';
+export interface StackledConfig {
+  outputFormat: OutputFormat;
   ignorePackages: string[];
-  severityThreshold: 'low' | 'medium' | 'high' | 'critical';
-  checkDeprecations: boolean;
+  checkDevDependencies: boolean;
+  cacheEnabled: boolean;
   cacheTtlMinutes: number;
+  registryUrl: string;
+}
+
+export interface VulnerabilityReport {
+  totalPackagesScanned: number;
+  vulnerablePackages: number;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  results: import('../core/vulnerability-scanner').ScanResult[];
+}
+
+export interface NotificationPayload {
+  title: string;
+  summary: string;
+  details: string[];
+  severity: VulnerabilitySeverity | 'info';
 }
