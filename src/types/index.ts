@@ -1,57 +1,75 @@
-export interface PackageJson {
-  name?: string;
-  version?: string;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
+export interface Dependency {
+  name: string;
+  version: string;
+  type?: 'dependency' | 'devDependency' | 'peerDependency';
 }
 
-export interface DependencyInfo {
+export interface ParsedPackage {
   name: string;
-  currentVersion: string;
-  latestVersion?: string;
+  version: string;
+  dependencies: Dependency[];
+}
+
+export interface RegistryPackage {
+  name: string;
+  version: string;
   description?: string;
-  repositoryUrl?: string;
-  deprecated?: boolean;
-  deprecationMessage?: string;
-  licenses?: string[];
-}
-
-export interface OutdatedDependency {
-  name: string;
-  currentVersion: string;
-  latestVersion: string;
-  versionDiff: string;
-  isStable: boolean;
-  updateAvailable: boolean;
+  repository?: string;
+  weeklyDownloads?: number;
+  deprecated?: string;
+  maintainers?: Array<{ name: string; email?: string }>;
+  time?: Record<string, string>;
+  versions?: Record<string, unknown>;
+  peerDependencies?: Record<string, string>;
+  license?: string;
 }
 
 export interface BreakingChange {
-  dependency: string;
+  package: string;
   fromVersion: string;
   toVersion: string;
   description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'high' | 'medium' | 'low';
 }
 
 export interface ImpactScore {
-  dependency: string;
+  package: string;
   score: number;
-  factors: string[];
+  reasons: string[];
 }
 
-export interface ScanReport {
-  scannedAt: string;
-  totalDependencies: number;
-  outdated: OutdatedDependency[];
-  breakingChanges: BreakingChange[];
-  impactScores: ImpactScore[];
+export interface OutdatedEntry {
+  package: string;
+  current: string;
+  latest: string;
+  updateType: 'major' | 'minor' | 'patch';
 }
 
-export interface StackledConfig {
-  outputFormat: 'table' | 'json' | 'markdown';
-  ignorePackages: string[];
-  severityThreshold: 'low' | 'medium' | 'high' | 'critical';
-  cacheEnabled: boolean;
-  cacheTtlMinutes: number;
+export interface VulnerabilitySummary {
+  critical: number;
+  high: number;
+  moderate: number;
+  low: number;
+  total: number;
+}
+
+export interface MaintainerStatus {
+  package: string;
+  lastPublish: string;
+  daysSinceLastPublish: number;
+  isAbandoned: boolean;
+  maintainerCount: number;
+}
+
+export interface TrendResult {
+  package: string;
+  trend: 'growing' | 'stable' | 'declining';
+  releaseFrequency: 'high' | 'medium' | 'low';
+  averageDaysBetweenReleases: number;
+}
+
+export interface PackageHealth {
+  package: string;
+  score: number;
+  grade: string;
 }
