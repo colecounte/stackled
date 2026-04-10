@@ -69,3 +69,22 @@ export function clearCache(key?: string): void {
 export function isCached(key: string): boolean {
   return readCache(key) !== null;
 }
+
+/**
+ * Returns the remaining TTL in milliseconds for a cached entry,
+ * or null if the entry does not exist or has already expired.
+ */
+export function getRemainingTtl(key: string): number | null {
+  const filePath = getCacheFilePath(key);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const entry: CacheEntry<unknown> = JSON.parse(raw);
+    const remaining = entry.ttl - (Date.now() - entry.timestamp);
+    return remaining > 0 ? remaining : null;
+  } catch {
+    return null;
+  }
+}
