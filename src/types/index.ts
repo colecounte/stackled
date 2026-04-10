@@ -1,93 +1,97 @@
-export interface DependencyInfo {
+export interface Dependency {
   name: string;
-  current: string;
-  latest: string;
-  latestStable: string;
-  updateType: 'major' | 'minor' | 'patch' | 'none';
-  hasBreakingChanges: boolean;
-  vulnerabilities: VulnerabilityEntry[];
-  deprecated?: boolean;
-  deprecationMessage?: string;
-  successor?: string;
-  repositoryUrl?: string;
-  license?: string;
-  weeklyDownloads?: number;
-  publishedAt?: string;
-  maintainers?: string[];
-  peerDependencies?: Record<string, string>;
-  bundleSize?: number;
-  versions?: string[];
+  version: string;
+  type: 'production' | 'development' | 'peer' | 'optional';
+  resolved?: string;
 }
 
-export interface VulnerabilityEntry {
-  id: string;
-  severity: 'low' | 'moderate' | 'high' | 'critical';
-  title: string;
-  url?: string;
+export interface PackageJson {
+  name?: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+}
+
+export interface RegistryPackage {
+  name: string;
+  version: string;
+  description?: string;
+  dist?: {
+    tarball?: string;
+    shasum?: string;
+    attestations?: {
+      url: string;
+      type: string;
+    };
+  };
+  repository?: string | { type: string; url: string };
+  license?: string;
+  funding?: string | { type: string; url: string } | Array<{ type: string; url: string }>;
+  engines?: Record<string, string>;
+  maintainers?: Array<{ name: string; email?: string }>;
+  deprecated?: string;
+  time?: Record<string, string>;
+  'dist-tags'?: Record<string, string>;
+  versions?: Record<string, RegistryPackage>;
 }
 
 export interface BreakingChange {
   version: string;
   description: string;
-  source: 'changelog' | 'commit' | 'inferred';
+  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export interface ImpactScore {
-  name: string;
-  score: number;
-  factors: string[];
+export interface DependencyReport {
+  dependency: Dependency;
+  latestVersion: string;
+  breakingChanges: BreakingChange[];
+  impactScore: number;
+  recommendation: string;
 }
 
-export interface HealthScore {
-  name: string;
-  overall: number;
-  grade: string;
-  maintenance: number;
-  security: number;
-  freshness: number;
-  popularity: number;
+export interface ScanReport {
+  generatedAt: string;
+  totalDependencies: number;
+  outdatedCount: number;
+  breakingChangesCount: number;
+  highImpactCount: number;
+  dependencies: DependencyReport[];
 }
 
 export interface StackledConfig {
   outputFormat: 'table' | 'json' | 'markdown';
   ignorePackages: string[];
-  severityThreshold: 'low' | 'moderate' | 'high' | 'critical';
+  severityThreshold: 'low' | 'medium' | 'high' | 'critical';
   cacheEnabled: boolean;
   cacheTtlMinutes: number;
-  registry: string;
-  ci?: {
-    failOnVulnerabilities: boolean;
-    failOnOutdated: boolean;
-    minHealthScore: number;
-  };
+  registryUrl: string;
+  ciFailOnHighRisk: boolean;
+  ciScoreThreshold: number;
 }
 
-export interface OutdatedEntry {
-  name: string;
-  current: string;
-  latest: string;
-  updateType: 'major' | 'minor' | 'patch';
+export interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttlMinutes: number;
 }
 
-export interface LicenseEntry {
-  name: string;
-  license: string;
-  risk: 'low' | 'medium' | 'high';
-  osiApproved: boolean;
-  copyleft: boolean;
+export interface NotificationPayload {
+  title: string;
+  summary: string;
+  details: string[];
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  packageName: string;
+  fromVersion: string;
+  toVersion: string;
 }
 
-export interface PeerIssue {
-  package: string;
-  peer: string;
-  required: string;
-  installed: string | null;
-  compatible: boolean;
-}
+export type UpdateType = 'major' | 'minor' | 'patch' | 'none';
 
-export interface BundleSizeEntry {
-  name: string;
-  bytes: number;
-  gzip: number;
-  impact: 'small' | 'medium' | 'large';
+export interface UpdateInfo {
+  dependency: Dependency;
+  latestVersion: string;
+  updateType: UpdateType;
+  isBreaking: boolean;
 }
