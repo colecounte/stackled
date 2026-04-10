@@ -45,8 +45,22 @@ export function registerMaintainerCommand(program: Command): void {
       const config = loadConfig();
       const packages = parsePackageJson(config.packageJsonPath ?? 'package.json');
       const names = packages.map((p) => p.name);
-      const registryData = await fetchRegistryData(names);
+
+      let registryData;
+      try {
+        registryData = await fetchRegistryData(names);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(chalk.red(`Error fetching registry data: ${message}`));
+        process.exit(1);
+      }
+
       const threshold = parseInt(options.threshold, 10);
+      if (isNaN(threshold) || threshold <= 0) {
+        console.error(chalk.red('--threshold must be a positive integer'));
+        process.exit(1);
+      }
+
       const statuses = checkMaintainers(packages, registryData, threshold);
 
       if (options.json) {
