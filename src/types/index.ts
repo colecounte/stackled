@@ -1,75 +1,93 @@
-export interface Dependency {
+export interface DependencyInfo {
   name: string;
-  version: string;
-  type?: 'dependency' | 'devDependency' | 'peerDependency';
-}
-
-export interface ParsedPackage {
-  name: string;
-  version: string;
-  dependencies: Dependency[];
-}
-
-export interface RegistryPackage {
-  name: string;
-  version: string;
-  description?: string;
-  repository?: string;
-  weeklyDownloads?: number;
-  deprecated?: string;
-  maintainers?: Array<{ name: string; email?: string }>;
-  time?: Record<string, string>;
-  versions?: Record<string, unknown>;
-  peerDependencies?: Record<string, string>;
+  current: string;
+  latest: string;
+  latestStable: string;
+  updateType: 'major' | 'minor' | 'patch' | 'none';
+  hasBreakingChanges: boolean;
+  vulnerabilities: VulnerabilityEntry[];
+  deprecated?: boolean;
+  deprecationMessage?: string;
+  successor?: string;
+  repositoryUrl?: string;
   license?: string;
+  weeklyDownloads?: number;
+  publishedAt?: string;
+  maintainers?: string[];
+  peerDependencies?: Record<string, string>;
+  bundleSize?: number;
+  versions?: string[];
+}
+
+export interface VulnerabilityEntry {
+  id: string;
+  severity: 'low' | 'moderate' | 'high' | 'critical';
+  title: string;
+  url?: string;
 }
 
 export interface BreakingChange {
-  package: string;
-  fromVersion: string;
-  toVersion: string;
+  version: string;
   description: string;
-  confidence: 'high' | 'medium' | 'low';
+  source: 'changelog' | 'commit' | 'inferred';
 }
 
 export interface ImpactScore {
-  package: string;
+  name: string;
   score: number;
-  reasons: string[];
+  factors: string[];
+}
+
+export interface HealthScore {
+  name: string;
+  overall: number;
+  grade: string;
+  maintenance: number;
+  security: number;
+  freshness: number;
+  popularity: number;
+}
+
+export interface StackledConfig {
+  outputFormat: 'table' | 'json' | 'markdown';
+  ignorePackages: string[];
+  severityThreshold: 'low' | 'moderate' | 'high' | 'critical';
+  cacheEnabled: boolean;
+  cacheTtlMinutes: number;
+  registry: string;
+  ci?: {
+    failOnVulnerabilities: boolean;
+    failOnOutdated: boolean;
+    minHealthScore: number;
+  };
 }
 
 export interface OutdatedEntry {
-  package: string;
+  name: string;
   current: string;
   latest: string;
   updateType: 'major' | 'minor' | 'patch';
 }
 
-export interface VulnerabilitySummary {
-  critical: number;
-  high: number;
-  moderate: number;
-  low: number;
-  total: number;
+export interface LicenseEntry {
+  name: string;
+  license: string;
+  risk: 'low' | 'medium' | 'high';
+  osiApproved: boolean;
+  copyleft: boolean;
 }
 
-export interface MaintainerStatus {
+export interface PeerIssue {
   package: string;
-  lastPublish: string;
-  daysSinceLastPublish: number;
-  isAbandoned: boolean;
-  maintainerCount: number;
+  peer: string;
+  required: string;
+  installed: string | null;
+  compatible: boolean;
 }
 
-export interface TrendResult {
-  package: string;
-  trend: 'growing' | 'stable' | 'declining';
-  releaseFrequency: 'high' | 'medium' | 'low';
-  averageDaysBetweenReleases: number;
-}
-
-export interface PackageHealth {
-  package: string;
-  score: number;
-  grade: string;
+export interface BundleSizeEntry {
+  name: string;
+  bytes: number;
+  gzip: number;
+  impact: 'small' | 'medium' | 'large';
 }
