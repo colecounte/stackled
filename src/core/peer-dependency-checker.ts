@@ -17,6 +17,12 @@ export interface PeerDependencyReport {
   hasIssues: boolean;
 }
 
+/**
+ * Checks whether an installed version satisfies a peer dependency range.
+ * Coerces loose version strings (e.g. "1.2.3-beta") before comparing.
+ *
+ * @returns `false` if `installedVersion` is null or cannot be coerced.
+ */
 export function checkPeerCompatibility(
   peerRange: string,
   installedVersion: string | null
@@ -27,6 +33,9 @@ export function checkPeerCompatibility(
   return semver.satisfies(coerced, peerRange);
 }
 
+/**
+ * Constructs a single {@link PeerDependencyIssue} for a given package/peer pair.
+ */
 export function buildPeerIssue(
   packageName: string,
   peerDep: string,
@@ -45,6 +54,14 @@ export function buildPeerIssue(
   };
 }
 
+/**
+ * Iterates over all packages and their declared `peerDependencies`, comparing
+ * each against `installedMap` to produce a consolidated report of missing or
+ * incompatible peer dependencies.
+ *
+ * @param packages    - List of parsed packages whose peer deps should be checked.
+ * @param installedMap - Map of package name → installed version string.
+ */
 export function checkPeerDependencies(
   packages: ParsedPackage[],
   installedMap: Record<string, string>
