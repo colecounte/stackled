@@ -1,58 +1,57 @@
-export type UpdateType = 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
-export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
-export type OutputFormat = 'table' | 'json' | 'minimal';
+export interface PackageJson {
+  name?: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
 
-export interface PackageInfo {
+export interface DependencyInfo {
   name: string;
-  version: string;
-  type: 'dependency' | 'devDependency' | 'peerDependency';
+  currentVersion: string;
   latestVersion?: string;
-  updateType?: UpdateType;
+  description?: string;
+  repositoryUrl?: string;
+  deprecated?: boolean;
+  deprecationMessage?: string;
+  licenses?: string[];
+}
+
+export interface OutdatedDependency {
+  name: string;
+  currentVersion: string;
+  latestVersion: string;
+  versionDiff: string;
+  isStable: boolean;
+  updateAvailable: boolean;
 }
 
 export interface BreakingChange {
-  packageName: string;
+  dependency: string;
   fromVersion: string;
   toVersion: string;
   description: string;
-  confidence: 'high' | 'medium' | 'low';
+  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export interface ImpactScore {
-  packageName: string;
+  dependency: string;
   score: number;
-  reasons: string[];
+  factors: string[];
 }
 
-export interface DependencyReport {
-  packages: PackageInfo[];
+export interface ScanReport {
+  scannedAt: string;
+  totalDependencies: number;
+  outdated: OutdatedDependency[];
   breakingChanges: BreakingChange[];
   impactScores: ImpactScore[];
-  generatedAt: string;
 }
 
 export interface StackledConfig {
-  outputFormat: OutputFormat;
+  outputFormat: 'table' | 'json' | 'markdown';
   ignorePackages: string[];
-  checkDevDependencies: boolean;
+  severityThreshold: 'low' | 'medium' | 'high' | 'critical';
   cacheEnabled: boolean;
   cacheTtlMinutes: number;
-  registryUrl: string;
-}
-
-export interface VulnerabilityReport {
-  totalPackagesScanned: number;
-  vulnerablePackages: number;
-  criticalCount: number;
-  highCount: number;
-  mediumCount: number;
-  lowCount: number;
-  results: import('../core/vulnerability-scanner').ScanResult[];
-}
-
-export interface NotificationPayload {
-  title: string;
-  summary: string;
-  details: string[];
-  severity: VulnerabilitySeverity | 'info';
 }
