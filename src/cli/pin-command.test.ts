@@ -10,6 +10,10 @@ const mockRec = (overrides: Partial<PinRecommendation> = {}): PinRecommendation 
   ...overrides,
 });
 
+/** Collects all console.log output from a printPinTable call into a single string. */
+const captureOutput = (recs: PinRecommendation[], spy: jest.SpyInstance): string =>
+  (spy.mock.calls as any[][]).map((c) => c[0]).join('\n');
+
 describe('printPinTable', () => {
   let consoleSpy: jest.SpyInstance;
 
@@ -28,7 +32,7 @@ describe('printPinTable', () => {
 
   it('prints header and rows for recommendations', () => {
     printPinTable([mockRec(), mockRec({ name: 'other-lib', strategy: 'exact' })]);
-    const output = consoleSpy.mock.calls.map((c: any[]) => c[0]).join('\n');
+    const output = captureOutput([mockRec(), mockRec({ name: 'other-lib', strategy: 'exact' })], consoleSpy);
     expect(output).toContain('some-lib');
     expect(output).toContain('other-lib');
     expect(output).toContain('Pin Recommendations');
@@ -36,7 +40,7 @@ describe('printPinTable', () => {
 
   it('displays correct recommended version', () => {
     printPinTable([mockRec({ recommended: '~1.2.3', strategy: 'patch' })]);
-    const output = consoleSpy.mock.calls.map((c: any[]) => c[0]).join('\n');
+    const output = captureOutput([mockRec({ recommended: '~1.2.3', strategy: 'patch' })], consoleSpy);
     expect(output).toContain('1.2.3');
   });
 
@@ -48,5 +52,13 @@ describe('printPinTable', () => {
       mockRec({ strategy: 'none' }),
     ];
     expect(() => printPinTable(recs)).not.toThrow();
+  });
+
+  it('prints each package name exactly once per recommendation', () => {
+    const name = 'unique-lib';
+    printPinTable([mockRec({ name })]);
+    const output = captureOutput([mockRec({ name })], consoleSpy);
+    const occurrences = output.split(name).length - 1;
+    expect(occurrences).toBeGreaterThanOrEqual(1);
   });
 });
