@@ -1,53 +1,50 @@
-import { BreakingChange } from '../types';
+import { ChangelogEntry } from '../types';
 
 export interface ChangelogSummary {
-  packageName: string;
-  fromVersion: string;
-  toVersion: string;
-  breakingChanges: BreakingChange[];
   highlights: string[];
+  hasSecurityFix: boolean;
+  hasDeprecation: boolean;
   totalChanges: number;
-  hasDeprecations: boolean;
-  hasSecurity: boolean;
+  breakingCount: number;
 }
 
-export function extractHighlights(lines: string[]): string[] {
-  const keywords = /feat|fix|perf|security|deprecat/i;
-  return lines
-    .filter((l) => keywords.test(l))
-    .map((l) => l.replace(/^[-*#\s]+/, '').trim())
-    .filter(Boolean)
-    .slice(0, 5);
+export function extractHighlights(entries: ChangelogEntry[]): string[] {
+  const highlights: string[] = [];
+  for (const entry of entries.slice(0, 3)) {
+    const top = entry.changes?.slice(0, 2) ?? [];
+    highlights.push(...top);
+  }
+  return highlights.slice(0, 5);
 }
 
-export function hasSecurityFixes(lines: string[]): boolean {
-  return lines.some((l) => /security|cve|vulnerability/i.test(l));
+export function hasSecurityFixes(entries: ChangelogEntry[]): boolean {
+  return entries.some((e) =>
+    e.changes?.some((c) => /security|vuln|cve|patch/i.test(c))
+  );
 }
 
-export function hasDeprecationNotices(lines: string[]): boolean {
-  return lines.some((l) => /deprecat/i.test(l));
+export function hasDeprecationNotices(entries: ChangelogEntry[]): boolean {
+  return entries.some((e) =>
+    e.changes?.some((c) => /deprecat/i.test(c))
+  );
 }
 
-export function countChanges(lines: string[]): number {
-  return lines.filter((l) => /^[-*]\s/.test(l.trim())).length;
+export function countChanges(entries: ChangelogEntry[]): number {
+  return entries.reduce((sum, e) => sum + (e.changes?.length ?? 0), 0);
 }
 
-export function summarizeChangelog(
-  packageName: string,
-  fromVersion: string,
-  toVersion: string,
-  rawChangelog: string,
-  breakingChanges: BreakingChange[]
-): ChangelogSummary {
-  const lines = rawChangelog.split('\n');
+export function summarizeChangelog(changelog: {
+  latestVersion?: string;
+  entries: ChangelogEntry[];
+}): ChangelogSummary {
+  const { entries } = changelog;
+  const breakingCount = entries.filter((e) => e.breaking).length;
+
   return {
-    packageName,
-    fromVersion,
-    toVersion,
-    breakingChanges,
-    highlights: extractHighlights(lines),
-    totalChanges: countChanges(lines),
-    hasDeprecations: hasDeprecationNotices(lines),
-    hasSecurity: hasSecurityFixes(lines),
+    highlights: extractHighlights(entries),
+    hasSecurityFix: hasSecurityFixes(entries),
+    hasDeprecation: hasDeprecationNotices(entries),
+    totalChanges: countChanges(entries),
+    breakingCount,
   };
 }

@@ -1,104 +1,99 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  addToWatchList,
-  removeFromWatchList,
   loadWatchList,
   saveWatchList,
-  checkWatchedPackage,
-  runWatchCheck,
-  WatchedPackage,
+  addToWatchList,
+  removeFromWatchList,
+  checkWatchList,
+  WatchEntry,
 } from './changelog-watcher';
+import * as cacheManager from './cache-manager';
 
 vi.mock('./cache-manager', () => ({
-  readCache: vi.fn(() => null),
+  readCache: vi.fn(),
   writeCache: vi.fn(),
+  getCacheFilePath: vi.fn(),
 }));
 
-vi.mock('./changelog-summarizer', () => ({
-  summarizeChangelog: vi.fn(() => ({ highlights: [], securityFixes: false, deprecations: false, totalChanges: 0 })),
-}));
-
-import { readCache, writeCache } from './cache-manager';
-
-const mockReadCache = vi.mocked(readCache);
-const mockWriteCache = vi.mocked(writeCache);
-
-const makeClient = (overrides: Partial<{ version: string; changelog: string }> = {}) => ({
-  getPackageInfo: vi.fn().mockResolvedValue({ version: overrides.version ?? '2.0.0', changelog: overrides.changelog ?? null }),
-});
+const mockReadCache = vi.mocked(cacheManager.readCache);
+const mockWriteCache = vi.mocked(cacheManager.writeCache);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockReadCache.mockReturnValue(null);
+});
+
+describe('loadWatchList', () => {
+  it('returns empty array when cache is empty', () => {
+    mockReadCache.mockReturnValue(null);
+    expect(loadWatchList()).toEqual([]);
+  });
+
+  it('returns cached entries', () => {
+    const entries: WatchEntry[] = [{ name: 'react', version: '18.0.0', addedAt: '2024-01-01' }];
+    mockReadCache.mockReturnValue(entries);
+    expect(loadWatchList()).toEqual(entries);
+  });
 });
 
 describe('addToWatchList', () => {
-  it('adds a new package to an empty list', () => {
-    mockReadCache.mockReturnValue(null);
-    const result = addToWatchList('react', '17.0.0');
+  it('adds a new entry', () => {
+    mockReadCache.mockReturnValue([]);
+    const result = addToWatchList('lodash', '4.17.21');
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('react');
-    expect(mockWriteCache).toHaveBeenCalled();
+    expect(result[0].name).toBe('lodash');
+    expect(mockWriteCache).toHaveBeenCalledOnce();
   });
 
-  it('updates existing entry instead of duplicating', () => {
-    const existing: WatchedPackage[] = [{ name: 'react', currentVersion: '17.0.0', watchedSince: '2024-01-01T00:00:00.000Z' }];
+  it('does not duplicate existing entry', () => {
+    const existing: WatchEntry[] = [{ name: 'lodash', version: '4.17.21', addedAt: '2024-01-01' }];
     mockReadCache.mockReturnValue(existing);
-    const result = addToWatchList('react', '18.0.0');
+    const result = addToWatchList('lodash', '4.17.21');
     expect(result).toHaveLength(1);
-    expect(result[0].currentVersion).toBe('18.0.0');
+    expect(mockWriteCache).not.toHaveBeenCalled();
   });
 });
 
 describe('removeFromWatchList', () => {
-  it('removes a package by name', () => {
-    const existing: WatchedPackage[] = [
-      { name: 'react', currentVersion: '17.0.0', watchedSince: '2024-01-01T00:00:00.000Z' },
-      { name: 'lodash', currentVersion: '4.0.0', watchedSince: '2024-01-01T00:00:00.000Z' },
+  it('removes an existing entry', () => {
+    const existing: WatchEntry[] = [
+      { name: 'lodash', version: '4.17.21', addedAt: '2024-01-01' },
+      { name: 'react', version: '18.0.0', addedAt: '2024-01-01' },
     ];
     mockReadCache.mockReturnValue(existing);
-    const result = removeFromWatchList('react');
+    const result = removeFromWatchList('lodash');
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('lodash');
+    expect(result[0].name).toBe('react');
   });
 
-  it('returns unchanged list if package not found', () => {
-    const existing: WatchedPackage[] = [{ name: 'lodash', currentVersion: '4.0.0', watchedSince: '2024-01-01T00:00:00.000Z' }];
+  it('returns unchanged list if entry not found', () => {
+    const existing: WatchEntry[] = [{ name: 'react', version: '18.0.0', addedAt: '2024-01-01' }];
     mockReadCache.mockReturnValue(existing);
     const result = removeFromWatchList('unknown');
     expect(result).toHaveLength(1);
   });
 });
 
-describe('checkWatchedPackage', () => {
-  it('detects an update and returns result', async () => {
-    const client = makeClient({ version: '2.0.0' }) as any;
-    const watched: WatchedPackage = { name: 'react', currentVersion: '1.0.0', watchedSince: '' };
-    const result = await checkWatchedPackage(client, watched);
-    expect(result.hasUpdate).toBe(true);
-    expect(result.latestVersion).toBe('2.0.0');
+describe('checkWatchList', () => {
+  it('returns results for each watched package', async () => {
+    const entries: WatchEntry[] = [{ name: 'axios', version: '1.0.0', addedAt: '2024-01-01' }];
+    mockReadCache.mockReturnValue(entries);
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      latestVersion: '1.1.0',
+      entries: [{ version: '1.1.0', changes: ['fix: bug fix'] }],
+    });
+
+    const results = await checkWatchList(mockFetch as any);
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe('axios');
+    expect(results[0].latestVersion).toBe('1.1.0');
   });
 
-  it('returns cached result if available', async () => {
-    const cachedResult = { name: 'react', currentVersion: '1.0.0', latestVersion: '1.0.0', hasUpdate: false, summary: null, checkedAt: '' };
-    mockReadCache.mockReturnValue(cachedResult);
-    const client = makeClient() as any;
-    const watched: WatchedPackage = { name: 'react', currentVersion: '1.0.0', watchedSince: '' };
-    const result = await checkWatchedPackage(client, watched);
-    expect(result).toBe(cachedResult);
-    expect(client.getPackageInfo).not.toHaveBeenCalled();
-  });
-});
-
-describe('runWatchCheck', () => {
-  it('checks all watched packages', async () => {
-    const list: WatchedPackage[] = [
-      { name: 'react', currentVersion: '17.0.0', watchedSince: '' },
-      { name: 'lodash', currentVersion: '4.0.0', watchedSince: '' },
-    ];
-    mockReadCache.mockReturnValueOnce(list).mockReturnValue(null);
-    const client = makeClient({ version: '18.0.0' }) as any;
-    const results = await runWatchCheck(client);
-    expect(results).toHaveLength(2);
+  it('handles fetch errors gracefully', async () => {
+    const entries: WatchEntry[] = [{ name: 'broken', version: '1.0.0', addedAt: '2024-01-01' }];
+    mockReadCache.mockReturnValue(entries);
+    const mockFetch = vi.fn().mockRejectedValue(new Error('network error'));
+    const results = await checkWatchList(mockFetch as any);
+    expect(results[0].hasNewRelease).toBe(false);
   });
 });

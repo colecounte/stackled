@@ -1,26 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
-import { registerWatchCommand } from './watch-command';
+import { printWatchResults, registerWatchCommand } from './watch-command';
+import * as watcher from '../core/changelog-watcher';
 
 vi.mock('../core/changelog-watcher', () => ({
-  loadWatchList: vi.fn(() => []),
-  addToWatchList: vi.fn(() => []),
-  removeFromWatchList: vi.fn(() => []),
-  runWatchCheck: vi.fn(async () => []),
+  addToWatchList: vi.fn(),
+  removeFromWatchList: vi.fn(),
+  loadWatchList: vi.fn(),
+  checkWatchList: vi.fn(),
 }));
 
-vi.mock('../core/registry-client', () => ({
-  createRegistryClient: vi.fn(() => ({})),
+vi.mock('../core/changelog-fetcher', () => ({
+  changelogFetcher: vi.fn(),
 }));
 
-import { loadWatchList, addToWatchList, removeFromWatchList, runWatchCheck } from '../core/changelog-watcher';
+const mockAdd = vi.mocked(watcher.addToWatchList);
+const mockRemove = vi.mocked(watcher.removeFromWatchList);
+const mockLoad = vi.mocked(watcher.loadWatchList);
+const mockCheck = vi.mocked(watcher.checkWatchList);
 
-const mockLoadWatchList = vi.mocked(loadWatchList);
-const mockAddToWatchList = vi.mocked(addToWatchList);
-const mockRemoveFromWatchList = vi.mocked(removeFromWatchList);
-const mockRunWatchCheck = vi.mocked(runWatchCheck);
-
-function buildProgram() {
+function buildProgram(): Command {
   const program = new Command();
   program.exitOverride();
   registerWatchCommand(program);
@@ -29,55 +28,69 @@ function buildProgram() {
 
 beforeEach(() => vi.clearAllMocks());
 
-describe('watch add', () => {
-  it('calls addToWatchList with package and version', async () => {
-    const program = buildProgram();
-    await program.parseAsync(['node', 'test', 'watch', 'add', 'react', '17.0.0']);
-    expect(mockAddToWatchList).toHaveBeenCalledWith('react', '17.0.0');
-  });
-});
-
-describe('watch remove', () => {
-  it('calls removeFromWatchList with package name', async () => {
-    const program = buildProgram();
-    await program.parseAsync(['node', 'test', 'watch', 'remove', 'react']);
-    expect(mockRemoveFromWatchList).toHaveBeenCalledWith('react');
-  });
-});
-
-describe('watch list', () => {
-  it('prints empty message when list is empty', async () => {
-    mockLoadWatchList.mockReturnValue([]);
+describe('printWatchResults', () => {
+  it('prints message when no results', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const program = buildProgram();
-    await program.parseAsync(['node', 'test', 'watch', 'list']);
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('empty'));
+    printWatchResults([]);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('No packages'));
     spy.mockRestore();
   });
 
-  it('prints watched packages when list has entries', async () => {
-    mockLoadWatchList.mockReturnValue([{ name: 'lodash', currentVersion: '4.0.0', watchedSince: '' }]);
+  it('prints results with new release indicator', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const program = buildProgram();
-    await program.parseAsync(['node', 'test', 'watch', 'list']);
-    const output = spy.mock.calls.flat().join(' ');
-    expect(output).toContain('lodash');
+    printWatchResults([{
+      name: 'react',
+      currentVersion: '18.0.0',
+      latestVersion: '18.2.0',
+      hasNewRelease: true,
+      summary: 'fix: memory leak',
+    }]);
+    const calls = spy.mock.calls.map((c) => c.join(' '));
+    expect(calls.some((c) => c.includes('react'))).toBe(true);
     spy.mockRestore();
   });
 });
 
-describe('watch check', () => {
-  it('calls runWatchCheck and prints results', async () => {
-    mockRunWatchCheck.mockResolvedValue([{
-      name: 'react', currentVersion: '17.0.0', latestVersion: '18.0.0',
-      hasUpdate: true, summary: null, checkedAt: '',
+describe('registerWatchCommand', () => {
+  it('watch add calls addToWatchList', async () => {
+    mockAdd.mockReturnValue([{ name: 'lodash', version: '4.0.0', addedAt: '' }]);
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const program = buildProgram();
+    await program.parseAsync(['watch', 'add', 'lodash', '4.0.0'], { from: 'user' });
+    expect(mockAdd).toHaveBeenCalledWith('lodash', '4.0.0');
+    spy.mockRestore();
+  });
+
+  it('watch remove calls removeFromWatchList', async () => {
+    mockRemove.mockReturnValue([]);
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const program = buildProgram();
+    await program.parseAsync(['watch', 'remove', 'lodash'], { from: 'user' });
+    expect(mockRemove).toHaveBeenCalledWith('lodash');
+    spy.mockRestore();
+  });
+
+  it('watch list prints watched packages', async () => {
+    mockLoad.mockReturnValue([{ name: 'axios', version: '1.0.0', addedAt: '2024-01-01' }]);
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const program = buildProgram();
+    await program.parseAsync(['watch', 'list'], { from: 'user' });
+    const output = spy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(output).toContain('axios');
+    spy.mockRestore();
+  });
+
+  it('watch check calls checkWatchList and prints results', async () => {
+    mockCheck.mockResolvedValue([{
+      name: 'vue',
+      currentVersion: '3.0.0',
+      latestVersion: '3.1.0',
+      hasNewRelease: true,
     }]);
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const program = buildProgram();
-    await program.parseAsync(['node', 'test', 'watch', 'check']);
-    expect(mockRunWatchCheck).toHaveBeenCalled();
-    const output = spy.mock.calls.flat().join(' ');
-    expect(output).toContain('react');
+    await program.parseAsync(['watch', 'check'], { from: 'user' });
+    expect(mockCheck).toHaveBeenCalledOnce();
     spy.mockRestore();
   });
 });

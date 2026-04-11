@@ -1,48 +1,58 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadWatchList, addToWatchList, removeFromWatchList, runWatchCheck, WatchResult } from '../core/changelog-watcher';
-import { createRegistryClient } from '../core/registry-client';
+import {
+  addToWatchList,
+  removeFromWatchList,
+  loadWatchList,
+  checkWatchList,
+  WatchResult,
+} from '../core/changelog-watcher';
+import { changelogFetcher } from '../core/changelog-fetcher';
 
-function printWatchResults(results: WatchResult[]): void {
+export function printWatchResults(results: WatchResult[]): void {
   if (results.length === 0) {
-    console.log(chalk.gray('No watched packages.'));
+    console.log(chalk.gray('No packages in watch list.'));
     return;
   }
+
   console.log(chalk.bold('\nChangelog Watch Results\n'));
   for (const r of results) {
-    const status = r.hasUpdate
-      ? chalk.yellow(`  ↑ ${r.currentVersion} → ${r.latestVersion}`)
-      : chalk.green('  ✓ up to date');
-    console.log(`${chalk.cyan(r.name)} ${status}`);
+    const status = r.hasNewRelease
+      ? chalk.green(`↑ ${r.latestVersion}`)
+      : chalk.gray('up to date');
+    const line = `  ${chalk.cyan(r.name.padEnd(30))} ${r.currentVersion.padEnd(12)} ${status}`;
+    console.log(line);
     if (r.summary) {
-      if (r.summary.securityFixes) console.log(chalk.red('    ⚠ security fixes included'));
-      if (r.summary.deprecations) console.log(chalk.yellow('    ! deprecation notices'));
-      if (r.summary.highlights.length > 0) {
-        r.summary.highlights.slice(0, 2).forEach((h) => console.log(chalk.gray(`    - ${h}`)));
-      }
+      console.log(chalk.gray(`    ${r.summary}`));
     }
   }
-  const updated = results.filter((r) => r.hasUpdate).length;
-  console.log(chalk.bold(`\n${updated}/${results.length} packages have updates.\n`));
+  console.log();
 }
 
 export function registerWatchCommand(program: Command): void {
-  const watch = program.command('watch').description('Monitor changelog updates for specific packages');
+  const watch = program
+    .command('watch')
+    .description('Manage changelog watch list for packages');
 
   watch
-    .command('add <package> <version>')
+    .command('add <name> <version>')
     .description('Add a package to the watch list')
-    .action((pkg: string, version: string) => {
-      addToWatchList(pkg, version);
-      console.log(chalk.green(`✓ Added ${pkg}@${version} to watch list`));
+    .action((name: string, version: string) => {
+      const updated = addToWatchList(name, version);
+      const added = updated.find((e) => e.name === name);
+      if (added) {
+        console.log(chalk.green(`✔ Added ${name}@${version} to watch list.`));
+      } else {
+        console.log(chalk.yellow(`${name} is already in the watch list.`));
+      }
     });
 
   watch
-    .command('remove <package>')
+    .command('remove <name>')
     .description('Remove a package from the watch list')
-    .action((pkg: string) => {
-      removeFromWatchList(pkg);
-      console.log(chalk.yellow(`Removed ${pkg} from watch list`));
+    .action((name: string) => {
+      removeFromWatchList(name);
+      console.log(chalk.green(`✔ Removed ${name} from watch list.`));
     });
 
   watch
@@ -55,16 +65,18 @@ export function registerWatchCommand(program: Command): void {
         return;
       }
       console.log(chalk.bold('\nWatched Packages:\n'));
-      list.forEach((p) => console.log(`  ${chalk.cyan(p.name)} @ ${p.currentVersion}`));
+      for (const e of list) {
+        console.log(`  ${chalk.cyan(e.name)} @ ${e.version}  ${chalk.gray(e.addedAt)}`);
+      }
       console.log();
     });
 
   watch
     .command('check')
-    .description('Check all watched packages for changelog updates')
+    .description('Check watched packages for new releases')
     .action(async () => {
-      const client = createRegistryClient();
-      const results = await runWatchCheck(client as any);
+      console.log(chalk.bold('Checking watched packages...'));
+      const results = await checkWatchList(changelogFetcher);
       printWatchResults(results);
     });
 }
