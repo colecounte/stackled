@@ -32,6 +32,11 @@ describe('fetchPackageMetadata', () => {
     mockedFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: 'Service Unavailable' } as never);
     await expect(fetchPackageMetadata('express')).rejects.toThrow('Registry request failed');
   });
+
+  it('throws on network failure', async () => {
+    mockedFetch.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    await expect(fetchPackageMetadata('express')).rejects.toThrow('ECONNREFUSED');
+  });
 });
 
 describe('fetchLatestVersion', () => {
@@ -57,6 +62,12 @@ describe('parseRegistryResponse', () => {
     const data = { ...mockRegistryResponse, repository: undefined };
     const result = parseRegistryResponse('express', data as never);
     expect(result.repositoryUrl).toBeUndefined();
+  });
+
+  it('strips .git suffix from repository URL', () => {
+    const data = { ...mockRegistryResponse, repository: { url: 'https://github.com/expressjs/express.git' } };
+    const result = parseRegistryResponse('express', data as never);
+    expect(result.repositoryUrl).toBe('https://github.com/expressjs/express');
   });
 
   it('parses publishedAt as a Date', () => {
