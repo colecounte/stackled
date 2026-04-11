@@ -33,6 +33,12 @@ describe('extractHighlights', () => {
   it('returns empty array for unrelated lines', () => {
     expect(extractHighlights(['chore: bump version', '## 1.0.0'])).toEqual([]);
   });
+
+  it('includes security lines in highlights', () => {
+    const lines = ['- security: patch CVE-2024-9999'];
+    const highlights = extractHighlights(lines);
+    expect(highlights).toContain('- security: patch CVE-2024-9999');
+  });
 });
 
 describe('hasSecurityFixes', () => {
@@ -46,6 +52,10 @@ describe('hasSecurityFixes', () => {
 
   it('returns false when no security lines', () => {
     expect(hasSecurityFixes(['- feat: new button'])).toBe(false);
+  });
+
+  it('returns false for empty input', () => {
+    expect(hasSecurityFixes([])).toBe(false);
   });
 });
 
@@ -81,5 +91,10 @@ describe('summarizeChangelog', () => {
     expect(summary.hasSecurity).toBe(true);
     expect(summary.hasDeprecations).toBe(true);
     expect(summary.totalChanges).toBeGreaterThan(0);
+  });
+
+  it('builds a summary with no breaking changes', () => {
+    const summary = summarizeChangelog('pkg', '1.0.0', '1.1.0', sampleChangelog, []);
+    expect(summary.breakingChanges).toHaveLength(0);
   });
 });
