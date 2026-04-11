@@ -59,6 +59,14 @@ describe('config-manager', () => {
       const config = loadConfig(tmpDir);
       expect(config.ignoredPackages).toEqual([]);
     });
+
+    it('throws or returns defaults when config file contains invalid JSON', () => {
+      fs.writeFileSync(getConfigPath(tmpDir), '{ invalid json }');
+      // loadConfig should gracefully fall back to defaults on parse error
+      expect(() => loadConfig(tmpDir)).not.toThrow();
+      const config = loadConfig(tmpDir);
+      expect(config.registryUrl).toBe('https://registry.npmjs.org');
+    });
   });
 
   describe('saveConfig', () => {
