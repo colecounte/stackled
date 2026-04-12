@@ -20,6 +20,20 @@ export function getCurrentNodeVersion(): string {
   return process.version;
 }
 
+/**
+ * Determines the severity of an engine incompatibility.
+ * - 'high': current Node is older than required (too old)
+ * - 'medium': current Node is newer than required (potentially too new)
+ * - 'low': compatible (no issue)
+ */
+function resolveEngineSeverity(
+  currentNode: string,
+  required: string
+): EngineIssue['severity'] {
+  const cleanedFloor = required.replace(/[^0-9.x*]/g, '').split(' ')[0] ?? '0.0.0';
+  return semver.gtr(currentNode, cleanedFloor) ? 'medium' : 'high';
+}
+
 export function checkEngineCompatibility(
   dep: ParsedDependency,
   engines: Record<string, string> | undefined,
@@ -30,18 +44,12 @@ export function checkEngineCompatibility(
   const required = engines.node;
   const compatible = semver.satisfies(currentNode, required);
 
-  const severity: EngineIssue['severity'] = compatible
-    ? 'low'
-    : semver.gtr(currentNode, required.replace(/[^0-9.x*]/g, '').split(' ')[0] ?? '0.0.0')
-    ? 'medium'
-    : 'high';
-
   return {
     name: dep.name,
     requiredNode: required,
     currentNode,
     compatible,
-    severity: compatible ? 'low' : severity,
+    severity: compatible ? 'low' : resolveEngineSeverity(currentNode, required),
   };
 }
 
