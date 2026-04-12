@@ -13,6 +13,12 @@ const makeReport = (overrides: Partial<VulnerabilityReport> = {}): Vulnerability
   ...overrides,
 });
 
+/** Helper to capture and join all console.log output from a printAuditReport call. */
+const captureOutput = (report: VulnerabilityReport, format: 'table' | 'json'): string => {
+  printAuditReport(report, format);
+  return consoleSpy.mock.calls.flat().join(' ');
+};
+
 describe('printAuditReport', () => {
   let consoleSpy: jest.SpyInstance;
 
@@ -23,8 +29,7 @@ describe('printAuditReport', () => {
   afterEach(() => consoleSpy.mockRestore());
 
   it('prints clean message when no vulnerabilities', () => {
-    printAuditReport(makeReport(), 'table');
-    const output = consoleSpy.mock.calls.flat().join(' ');
+    const output = captureOutput(makeReport(), 'table');
     expect(output).toMatch(/No vulnerabilities found/);
   });
 
@@ -55,8 +60,7 @@ describe('printAuditReport', () => {
       },
     ];
     const report = makeReport({ vulnerablePackages: 1, highCount: 1, results });
-    printAuditReport(report, 'table');
-    const output = consoleSpy.mock.calls.flat().join(' ');
+    const output = captureOutput(report, 'table');
     expect(output).toMatch(/lodash/);
     expect(output).toMatch(/Prototype Pollution/);
     expect(output).toMatch(/4.17.21/);
