@@ -1,93 +1,110 @@
-import { parseReleaseNote, extractReleaseNotes, formatReleaseNotesSummary } from './changelog-release-notes';
-import { RegistryPackageInfo } from '../types';
+import {
+  parseReleaseNote,
+  extractReleaseNotes,
+  formatReleaseNotesSummary,
+  ReleaseNote,
+} from './changelog-release-notes';
+import { PackageInfo } from '../types';
 
-function makePackageInfo(overrides: Partial<RegistryPackageInfo> = {}): RegistryPackageInfo {
+function makePackageInfo(overrides: Partial<PackageInfo> = {}): PackageInfo {
   return {
     name: 'my-lib',
-    version: '2.0.0',
-    description: 'A test library',
-    versions: {
-      '1.0.0': { description: 'Initial release' },
-      '1.1.0': { description: 'Added new feature' },
-      '2.0.0': { description: 'BREAKING CHANGE: removed old API' },
-    },
+    currentVersion: '1.0.0',
+    latestVersion: '2.0.0',
+    description: '',
+    license: 'MIT',
+    repository: '',
+    dependencies: {},
+    devDependencies: {},
     ...overrides,
-  } as unknown as RegistryPackageInfo;
+  };
 }
 
 describe('parseReleaseNote', () => {
-  it('detects breaking changes', () => {
-    const note = parseReleaseNote('2.0.0', 'BREAKING CHANGE: removed foo', '2024-01-01');
+  it('parses basic fields', () => {
+    const raw = {
+      version: '2.0.0',
+      tag_name: '2.0.0',
+      name: 'Release 2.0.0',
+      body: 'Some improvements.',
+      published_at: '2024-01-15',
+    };
+    const note = parseReleaseNote(raw);
+    expect(note.version).toBe('2.0.0');
+    expect(note.title).toBe('Release 2.0.0');
+    expect(note.date).toBe('2024-01-15');
+    expect(note.isBreaking).toBe(false);
+    expect(note.isSecurityFix).toBe(false);
+  });
+
+  it('detects breaking changes in body', () => {
+    const raw = { version: '2.0.0', body: 'BREAKING CHANGE: removed old API.' };
+    const note = parseReleaseNote(raw);
     expect(note.isBreaking).toBe(true);
-    expect(note.hasSecurity).toBe(false);
   });
 
   it('detects security fixes', () => {
-    const note = parseReleaseNote('1.0.1', 'Patched security vulnerability CVE-2024-1234', '2024-02-01');
-    expect(note.hasSecurity).toBe(true);
-    expect(note.isBreaking).toBe(false);
+    const raw = { version: '1.2.1', body: 'Fix security vulnerability CVE-2024-1234.' };
+    const note = parseReleaseNote(raw);
+    expect(note.isSecurityFix).toBe(true);
   });
 
-  it('handles neutral release', () => {
-    const note = parseReleaseNote('1.1.0', 'Added new feature', null);
+  it('handles missing fields gracefully', () => {
+    const note = parseReleaseNote({});
+    expect(note.version).toBe('');
+    expect(note.body).toBe('');
     expect(note.isBreaking).toBe(false);
-    expect(note.hasSecurity).toBe(false);
-    expect(note.date).toBeNull();
   });
 });
 
 describe('extractReleaseNotes', () => {
-  it('returns all releases when no fromVersion given', () => {
-    const info = makePackageInfo();
-    const result = extractReleaseNotes(info);
-    expect(result.totalReleases).toBe(3);
-    expect(result.packageName).toBe('my-lib');
+  const releases = [
+    { version: '2.0.0', body: 'BREAKING CHANGE: new API', published_at: '2024-03-01' },
+    { version: '1.5.0', body: 'Feature additions', published_at: '2024-01-10' },
+    { version: '1.0.0', body: 'Initial release', published_at: '2023-12-01' },
+  ];
+
+  it('excludes the fromVersion', () => {
+    const notes = extractReleaseNotes(releases, '1.0.0', '2.0.0');
+    expect(notes.find((n) => n.version === '1.0.0')).toBeUndefined();
   });
 
-  it('filters releases after fromVersion', () => {
-    const info = makePackageInfo();
-    const result = extractReleaseNotes(info, '1.0.0');
-    expect(result.notes.every((n) => n.version > '1.0.0')).toBe(true);
+  it('returns remaining releases', () => {
+    const notes = extractReleaseNotes(releases, '1.0.0', '2.0.0');
+    expect(notes.length).toBe(2);
   });
 
-  it('detects breaking changes in result', () => {
-    const info = makePackageInfo();
-    const result = extractReleaseNotes(info);
-    expect(result.hasBreakingChanges).toBe(true);
-  });
-
-  it('returns empty notes when no versions', () => {
-    const info = makePackageInfo({ versions: {} } as never);
-    const result = extractReleaseNotes(info);
-    expect(result.totalReleases).toBe(0);
-    expect(result.hasBreakingChanges).toBe(false);
-    expect(result.hasSecurityFixes).toBe(false);
+  it('limits to 20 results', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      version: `1.${i}.0`,
+      body: 'update',
+    }));
+    const notes = extractReleaseNotes(many, '0.0.0', '1.29.0');
+    expect(notes.length).toBeLessThanOrEqual(20);
   });
 });
 
 describe('formatReleaseNotesSummary', () => {
-  it('includes package name and release count', () => {
-    const info = makePackageInfo();
-    const result = extractReleaseNotes(info);
-    const summary = formatReleaseNotesSummary(result);
-    expect(summary).toContain('my-lib');
-    expect(summary).toContain('3 releases');
+  it('builds summary correctly', () => {
+    const pkg = makePackageInfo();
+    const notes: ReleaseNote[] = [
+      { version: '2.0.0', body: 'BREAKING CHANGE: new API', isBreaking: true, isSecurityFix: false },
+      { version: '1.5.0', body: 'Fix security issue', isBreaking: false, isSecurityFix: true },
+    ];
+    const summary = formatReleaseNotesSummary(pkg, notes);
+    expect(summary.packageName).toBe('my-lib');
+    expect(summary.totalReleases).toBe(2);
+    expect(summary.hasBreakingChanges).toBe(true);
+    expect(summary.hasSecurityFixes).toBe(true);
   });
 
-  it('warns about breaking changes', () => {
-    const info = makePackageInfo();
-    const result = extractReleaseNotes(info);
-    const summary = formatReleaseNotesSummary(result);
-    expect(summary).toContain('breaking changes');
-  });
-
-  it('shows at most 5 notes', () => {
-    const versions: Record<string, unknown> = {};
-    for (let i = 1; i <= 10; i++) versions[`1.${i}.0`] = { description: `Release ${i}` };
-    const info = makePackageInfo({ versions } as never);
-    const result = extractReleaseNotes(info);
-    const summary = formatReleaseNotesSummary(result);
-    const lines = summary.split('\n').filter((l) => l.startsWith('  1.'));
-    expect(lines.length).toBeLessThanOrEqual(5);
+  it('reports false flags when no special notes', () => {
+    const pkg = makePackageInfo();
+    const notes: ReleaseNote[] = [
+      { version: '1.1.0', body: 'Minor update', isBreaking: false, isSecurityFix: false },
+    ];
+    const summary = formatReleaseNotesSummary(pkg, notes);
+    expect(summary.hasBreakingChanges).toBe(false);
+    expect(summary.hasSecurityFixes).toBe(false);
   });
 });

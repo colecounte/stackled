@@ -1,71 +1,65 @@
-import { RegistryPackageInfo } from '../types';
+import { PackageInfo } from '../types';
 
 export interface ReleaseNote {
   version: string;
-  date: string | null;
+  date?: string;
+  title?: string;
   body: string;
   isBreaking: boolean;
-  hasSecurity: boolean;
+  isSecurityFix: boolean;
 }
 
-export interface ReleaseNotesResult {
+export interface ReleaseNotesSummary {
   packageName: string;
+  currentVersion: string;
+  latestVersion: string;
   notes: ReleaseNote[];
   totalReleases: number;
   hasBreakingChanges: boolean;
   hasSecurityFixes: boolean;
 }
 
-const BREAKING_PATTERNS = /breaking change|breaking:|BREAKING/i;
-const SECURITY_PATTERNS = /security|cve-|vulnerability|vuln|patch.*security/i;
+export function parseReleaseNote(raw: Record<string, unknown>): ReleaseNote {
+  const body = String(raw['body'] ?? raw['description'] ?? '');
+  const isBreaking =
+    /breaking[\s-]change|BREAKING/i.test(body) ||
+    /^#+\s*v?\d+\.\d+\.\d+.*breaking/im.test(body);
+  const isSecurityFix =
+    /security|cve-\d{4}/i.test(body) ||
+    /fix.*vuln|patch.*security/i.test(body);
 
-export function parseReleaseNote(version: string, body: string, date: string | null): ReleaseNote {
   return {
-    version,
-    date,
-    body: body.trim(),
-    isBreaking: BREAKING_PATTERNS.test(body),
-    hasSecurity: SECURITY_PATTERNS.test(body),
+    version: String(raw['version'] ?? raw['tag_name'] ?? ''),
+    date: raw['published_at'] ? String(raw['published_at']) : undefined,
+    title: raw['name'] ? String(raw['name']) : undefined,
+    body,
+    isBreaking,
+    isSecurityFix,
   };
 }
 
 export function extractReleaseNotes(
-  packageInfo: RegistryPackageInfo,
-  fromVersion?: string,
-): ReleaseNotesResult {
-  const versions = packageInfo.versions ?? {};
-  const time = (packageInfo as Record<string, unknown>).time as Record<string, string> | undefined;
+  releases: Record<string, unknown>[],
+  fromVersion: string,
+  toVersion: string
+): ReleaseNote[] {
+  return releases
+    .map(parseReleaseNote)
+    .filter((n) => n.version && n.version !== fromVersion)
+    .slice(0, 20);
+}
 
-  const notes: ReleaseNote[] = Object.keys(versions)
-    .filter((v) => {
-      if (!fromVersion) return true;
-      const from = fromVersion.replace(/^[^0-9]*/, '');
-      return v > from;
-    })
-    .map((v) => {
-      const meta = versions[v] as Record<string, unknown>;
-      const body = (meta?.description as string) ?? '';
-      const date = time?.[v] ?? null;
-      return parseReleaseNote(v, body, date);
-    })
-    .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
-
+export function formatReleaseNotesSummary(
+  pkg: PackageInfo,
+  notes: ReleaseNote[]
+): ReleaseNotesSummary {
   return {
-    packageName: packageInfo.name,
+    packageName: pkg.name,
+    currentVersion: pkg.currentVersion,
+    latestVersion: pkg.latestVersion,
     notes,
     totalReleases: notes.length,
     hasBreakingChanges: notes.some((n) => n.isBreaking),
-    hasSecurityFixes: notes.some((n) => n.hasSecurity),
+    hasSecurityFixes: notes.some((n) => n.isSecurityFix),
   };
-}
-
-export function formatReleaseNotesSummary(result: ReleaseNotesResult): string {
-  const lines: string[] = [`Release notes for ${result.packageName} (${result.totalReleases} releases)`];
-  if (result.hasBreakingChanges) lines.push('  ⚠ Contains breaking changes');
-  if (result.hasSecurityFixes) lines.push('  🔒 Contains security fixes');
-  for (const note of result.notes.slice(0, 5)) {
-    const date = note.date ? ` (${note.date.slice(0, 10)})` : '';
-    lines.push(`  ${note.version}${date}: ${note.body.slice(0, 80) || '(no description)'}`);
-  }
-  return lines.join('\n');
 }
