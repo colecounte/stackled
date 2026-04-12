@@ -11,6 +11,14 @@ const severityColor = {
   critical: chalk.bgRed.white,
 };
 
+/**
+ * Fetches, summarizes, and diffs the changelogs for a package between two versions,
+ * then prints a formatted diff report to stdout.
+ *
+ * @param packageName - The npm package name to diff.
+ * @param fromVersion - The baseline (older) version.
+ * @param toVersion   - The target (newer) version.
+ */
 export async function printChangelogDiff(
   packageName: string,
   fromVersion: string,
@@ -53,7 +61,8 @@ export function registerChangelogDiffCommand(program: Command): void {
       try {
         await printChangelogDiff(pkg, from, to);
       } catch (err) {
-        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        const message = (err as Error).message ?? String(err);
+        console.error(chalk.red(`Error: ${message}`));
         process.exit(1);
       }
     });
