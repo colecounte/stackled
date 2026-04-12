@@ -83,4 +83,12 @@ export class DependencyAnalyzer {
   findDependency(dependencies: DependencyInfo[], name: string): DependencyInfo | undefined {
     return dependencies.find((dep) => dep.name === name);
   }
+
+  /**
+   * Searches for dependencies whose names contain the given query string (case-insensitive)
+   */
+  searchDependencies(dependencies: DependencyInfo[], query: string): DependencyInfo[] {
+    const lowerQuery = query.toLowerCase();
+    return dependencies.filter((dep) => dep.name.toLowerCase().includes(lowerQuery));
+  }
 }
