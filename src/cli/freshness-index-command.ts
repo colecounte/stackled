@@ -8,6 +8,8 @@ import {
   type FreshnessIndexEntry,
 } from '../core/dependency-freshness-index.js';
 
+const GRADE_ORDER = ['F', 'D', 'C', 'B', 'A'] as const;
+
 function gradeColor(grade: string): string {
   switch (grade) {
     case 'A': return chalk.green(grade);
@@ -16,6 +18,15 @@ function gradeColor(grade: string): string {
     case 'D': return chalk.magenta(grade);
     default:  return chalk.red(grade);
   }
+}
+
+/**
+ * Returns true if `grade` is at or below `threshold` in the A–F scale.
+ * For example, isAtOrBelowGrade('C', 'B') => true (C is worse than B).
+ */
+function isAtOrBelowGrade(grade: string, threshold: string): boolean {
+  return GRADE_ORDER.indexOf(grade as typeof GRADE_ORDER[number]) <=
+         GRADE_ORDER.indexOf(threshold as typeof GRADE_ORDER[number]);
 }
 
 export function printFreshnessIndexTable(entries: FreshnessIndexEntry[]): void {
@@ -47,7 +58,7 @@ export function registerFreshnessIndexCommand(program: Command): void {
     .command('freshness-index')
     .description('Score and rank all dependencies by how fresh they are')
     .option('-p, --path <path>', 'Path to package.json', 'package.json')
-    .option('--min-grade <grade>', 'Only show packages at or below this grade')
+    .option('--min-grade <grade>', 'Only show packages at or below this grade (e.g. C shows C, D, and F)')
     .action(async (opts) => {
       const deps = parsePackageJson(opts.path);
       const client = createRegistryClient();
@@ -65,8 +76,9 @@ export function registerFreshnessIndexCommand(program: Command): void {
         }
       }
 
-      const filtered = opts.minGrade
-        ? entries.filter(e => ['F', 'D', 'C', 'B', 'A'].indexOf(e.grade) <= ['F', 'D', 'C', 'B', 'A'].indexOf(opts.minGrade.toUpperCase()))
+      const minGrade = opts.minGrade?.toUpperCase();
+      const filtered = minGrade
+        ? entries.filter(e => isAtOrBelowGrade(e.grade, minGrade))
         : entries;
 
       printFreshnessIndexTable(filtered);
