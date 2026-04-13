@@ -82,3 +82,15 @@ export function summarizeBudgets(entries: BudgetEntry[]): BudgetSummary {
     totalBudgetBytes: entries.reduce((sum, e) => sum + e.budgetBytes, 0),
   };
 }
+
+/**
+ * Returns only the budget entries whose status matches one of the given statuses.
+ * Useful for filtering down to actionable entries, e.g. warnings and overages only.
+ */
+export function filterBudgetEntries(
+  entries: BudgetEntry[],
+  statuses: BudgetStatus[],
+): BudgetEntry[] {
+  const statusSet = new Set(statuses);
+  return entries.filter((e) => statusSet.has(e.status));
+}
