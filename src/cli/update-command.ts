@@ -38,7 +38,17 @@ export function registerUpdateCommand(yargs: Argv): Argv {
           console.log(chalk.green('✔ stackled is up to date.'));
         }
       } catch (err) {
-        console.error(chalk.red('Failed to check for updates:'), (err as Error).message);
+        const message = err instanceof Error ? err.message : String(err);
+        const isNetworkError =
+          message.includes('ENOTFOUND') ||
+          message.includes('ECONNREFUSED') ||
+          message.includes('ETIMEDOUT');
+
+        if (isNetworkError) {
+          console.error(chalk.red('Failed to check for updates: could not reach the registry. Check your network connection.'));
+        } else {
+          console.error(chalk.red('Failed to check for updates:'), message);
+        }
         process.exitCode = 1;
       }
     },
