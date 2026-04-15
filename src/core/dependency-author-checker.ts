@@ -1,75 +1,104 @@
-import { PackageInfo } from '../types';
+export interface AuthorInfo {
+  name?: string;
+  email?: string;
+  url?: string;
+}
+
+export interface PackageAuthorInfo {
+  name: string;
+  version: string;
+  author?: AuthorInfo | string;
+  maintainers?: AuthorInfo[];
+  repository?: { type?: string; url?: string } | string;
+}
 
 export interface AuthorEntry {
   name: string;
-  author: string;
-  authorEmail: string | null;
-  isOrg: boolean;
-  numMaintainers: number;
-  riskLevel: 'low' | 'medium' | 'high';
+  version: string;
+  authorName: string | null;
+  maintainerCount: number;
+  hasRepository: boolean;
+  isOrgBacked: boolean;
+  risk: 'low' | 'medium' | 'high';
   flags: string[];
 }
 
-export interface AuthorSummary {
-  total: number;
-  highRisk: number;
-  singleMaintainer: number;
-  noAuthor: number;
+export function isOrgAuthor(pkg: PackageAuthorInfo): boolean {
+  const repoUrl =
+    typeof pkg.repository === 'string'
+      ? pkg.repository
+      : pkg.repository?.url ?? '';
+  return repoUrl.length > 0;
 }
 
-export function classifyAuthorRisk(
-  author: string | null,
-  numMaintainers: number
-): 'low' | 'medium' | 'high' {
-  if (!author) return 'high';
-  if (numMaintainers === 1) return 'medium';
-  if (numMaintainers === 0) return 'high';
-  return 'low';
-}
-
-export function buildAuthorFlags(
-  author: string | null,
-  numMaintainers: number
-): string[] {
+export function buildAuthorFlags(pkg: PackageAuthorInfo): string[] {
   const flags: string[] = [];
-  if (!author) flags.push('no-author');
-  if (numMaintainers === 0) flags.push('no-maintainers');
-  if (numMaintainers === 1) flags.push('single-maintainer');
+
+  if (!pkg.author) flags.push('no-author');
+
+  const maintainerCount = pkg.maintainers?.length ?? 0;
+  if (maintainerCount <= 1) flags.push('single-maintainer');
+
+  const repoUrl =
+    typeof pkg.repository === 'string'
+      ? pkg.repository
+      : pkg.repository?.url ?? '';
+  if (!repoUrl) flags.push('no-repository');
+
   return flags;
 }
 
-export function isOrgAuthor(author: string): boolean {
-  return /\binc\b|\bllc\b|\bcorp\b|\bteam\b|\bgroup\b/i.test(author);
+export function classifyAuthorRisk(flags: string[]): 'low' | 'medium' | 'high' {
+  if (flags.includes('no-author') && flags.includes('no-repository')) return 'high';
+  if (flags.includes('no-author') || flags.includes('no-repository')) return 'high';
+  if (flags.includes('single-maintainer')) return 'medium';
+  return 'low';
 }
 
-export function buildAuthorEntry(pkg: PackageInfo): AuthorEntry {
-  const author = pkg.author ?? null;
-  const maintainers = Array.isArray(pkg.maintainers) ? pkg.maintainers : [];
-  const numMaintainers = maintainers.length;
-  const riskLevel = classifyAuthorRisk(author, numMaintainers);
-  const flags = buildAuthorFlags(author, numMaintainers);
-  const authorEmail = pkg.authorEmail ?? null;
+export function buildAuthorEntry(
+  name: string,
+  version: string,
+  pkg: PackageAuthorInfo,
+): AuthorEntry {
+  const flags = buildAuthorFlags(pkg);
+  const risk = classifyAuthorRisk(flags);
+  const authorName =
+    typeof pkg.author === 'string'
+      ? pkg.author
+      : pkg.author?.name ?? null;
+  const repoUrl =
+    typeof pkg.repository === 'string'
+      ? pkg.repository
+      : pkg.repository?.url ?? '';
 
   return {
-    name: pkg.name,
-    author: author ?? 'unknown',
-    authorEmail,
-    isOrg: author ? isOrgAuthor(author) : false,
-    numMaintainers,
-    riskLevel,
+    name,
+    version,
+    authorName,
+    maintainerCount: pkg.maintainers?.length ?? 0,
+    hasRepository: repoUrl.length > 0,
+    isOrgBacked: isOrgAuthor(pkg),
+    risk,
     flags,
   };
 }
 
-export function checkDependencyAuthors(packages: PackageInfo[]): AuthorEntry[] {
-  return packages.map(buildAuthorEntry);
+export function checkDependencyAuthors(
+  deps: Array<{ name: string; version: string; packageInfo: PackageAuthorInfo }>,
+): AuthorEntry[] {
+  return deps.map((d) => buildAuthorEntry(d.name, d.version, d.packageInfo));
 }
 
-export function summarizeAuthors(entries: AuthorEntry[]): AuthorSummary {
+export function summarizeAuthors(entries: AuthorEntry[]): {
+  total: number;
+  high: number;
+  medium: number;
+  low: number;
+} {
   return {
     total: entries.length,
-    highRisk: entries.filter((e) => e.riskLevel === 'high').length,
-    singleMaintainer: entries.filter((e) => e.numMaintainers === 1).length,
-    noAuthor: entries.filter((e) => e.author === 'unknown').length,
+    high: entries.filter((e) => e.risk === 'high').length,
+    medium: entries.filter((e) => e.risk === 'medium').length,
+    low: entries.filter((e) => e.risk === 'low').length,
   };
 }
