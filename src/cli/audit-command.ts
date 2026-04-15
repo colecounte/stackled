@@ -44,16 +44,22 @@ export function registerAuditCommand(program: Command): void {
     .option('--format <format>', 'Output format: table or json', 'table')
     .option('--path <path>', 'Path to package.json', './package.json')
     .action(async (options) => {
-      const config = await loadConfig();
-      const packages = await parsePackageJson(options.path);
-      const filtered = config.checkDevDependencies
-        ? packages
-        : packages.filter((p) => p.type === 'dependency');
+      try {
+        const config = await loadConfig();
+        const packages = await parsePackageJson(options.path);
+        const filtered = config.checkDevDependencies
+          ? packages
+          : packages.filter((p) => p.type === 'dependency');
 
-      const report = await scanPackages(filtered, async (_name, _version): Promise<Vulnerability[]> => []);
-      printAuditReport(report, options.format ?? config.outputFormat);
+        const report = await scanPackages(filtered, async (_name, _version): Promise<Vulnerability[]> => []);
+        printAuditReport(report, options.format ?? config.outputFormat);
 
-      if (report.criticalCount > 0 || report.highCount > 0) {
+        if (report.criticalCount > 0 || report.highCount > 0) {
+          process.exitCode = 1;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(chalk.red(`✖ Audit failed: ${message}`));
         process.exitCode = 1;
       }
     });
