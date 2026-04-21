@@ -1,93 +1,90 @@
 import { ParsedDependency } from '../types';
 
-export type LicenseCompatibilityRisk = 'none' | 'low' | 'medium' | 'high';
-
 export interface LicenseCompatibilityEntry {
   name: string;
   version: string;
   licenseA: string;
   licenseB: string;
   compatible: boolean;
-  risk: LicenseCompatibilityRisk;
   reason: string;
 }
 
-export interface LicenseCompatibilitySummary {
-  total: number;
-  incompatible: number;
-  highRisk: number;
+export interface LicenseCompatibilityReport {
   entries: LicenseCompatibilityEntry[];
+  incompatibleCount: number;
+  checkedCount: number;
 }
 
-const COPYLEFT_LICENSES = new Set(['GPL-2.0', 'GPL-3.0', 'AGPL-3.0', 'LGPL-2.1', 'LGPL-3.0']);
-const PERMISSIVE_LICENSES = new Set(['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0']);
+// Simplified SPDX compatibility matrix
+const INCOMPATIBLE_PAIRS: Array<[string, string]> = [
+  ['GPL-2.0', 'MIT'],
+  ['GPL-2.0', 'Apache-2.0'],
+  ['GPL-3.0', 'Apache-2.0'],
+  ['AGPL-3.0', 'MIT'],
+  ['AGPL-3.0', 'Apache-2.0'],
+  ['LGPL-2.1', 'Apache-2.0'],
+];
 
-export function areLicensesCompatible(
-  licenseA: string,
-  licenseB: string
-): { compatible: boolean; risk: LicenseCompatibilityRisk; reason: string } {
-  const aIsCopyleft = COPYLEFT_LICENSES.has(licenseA);
-  const bIsCopyleft = COPYLEFT_LICENSES.has(licenseB);
-  const aIsPermissive = PERMISSIVE_LICENSES.has(licenseA);
-  const bIsPermissive = PERMISSIVE_LICENSES.has(licenseB);
+const COPYLEFT_LICENSES = new Set([
+  'GPL-2.0', 'GPL-3.0', 'AGPL-3.0', 'LGPL-2.1', 'LGPL-3.0',
+]);
 
-  if (licenseA === licenseB) {
-    return { compatible: true, risk: 'none', reason: 'Same license' };
+export function areLicensesCompatible(licenseA: string, licenseB: string): { compatible: boolean; reason: string } {
+  if (!licenseA || !licenseB) {
+    return { compatible: true, reason: 'One or both licenses are unknown; skipping check' };
   }
 
-  if (aIsCopyleft && bIsCopyleft) {
-    const bothGpl = licenseA.startsWith('GPL') && licenseB.startsWith('GPL');
-    return bothGpl
-      ? { compatible: false, risk: 'high', reason: 'Incompatible copyleft licenses' }
-      : { compatible: false, risk: 'high', reason: 'Mixing copyleft licenses is risky' };
+  const normalA = licenseA.trim().toUpperCase();
+  const normalB = licenseB.trim().toUpperCase();
+
+  if (normalA === normalB) {
+    return { compatible: true, reason: 'Same license' };
   }
 
-  if (aIsCopyleft && bIsPermissive) {
-    return { compatible: true, risk: 'medium', reason: 'Copyleft may impose redistribution requirements' };
+  for (const [a, b] of INCOMPATIBLE_PAIRS) {
+    if (
+      (a.toUpperCase() === normalA && b.toUpperCase() === normalB) ||
+      (a.toUpperCase() === normalB && b.toUpperCase() === normalA)
+    ) {
+      return { compatible: false, reason: `${licenseA} is incompatible with ${licenseB}` };
+    }
   }
 
-  if (aIsPermissive && bIsCopyleft) {
-    return { compatible: true, risk: 'medium', reason: 'Copyleft dependency may affect your distribution terms' };
+  if (COPYLEFT_LICENSES.has(licenseA) && !COPYLEFT_LICENSES.has(licenseB)) {
+    return { compatible: false, reason: `Copyleft license ${licenseA} may be incompatible with ${licenseB}` };
   }
 
-  if (aIsPermissive && bIsPermissive) {
-    return { compatible: true, risk: 'none', reason: 'Both permissive licenses are compatible' };
-  }
-
-  return { compatible: false, risk: 'high', reason: 'Unknown or proprietary license combination' };
+  return { compatible: true, reason: 'No known incompatibility detected' };
 }
 
 export function buildCompatibilityEntry(
   dep: ParsedDependency,
-  projectLicense: string,
-  depLicense: string
+  licenseA: string,
+  licenseB: string
 ): LicenseCompatibilityEntry {
-  const { compatible, risk, reason } = areLicensesCompatible(projectLicense, depLicense);
+  const { compatible, reason } = areLicensesCompatible(licenseA, licenseB);
   return {
     name: dep.name,
     version: dep.version,
-    licenseA: projectLicense,
-    licenseB: depLicense,
+    licenseA,
+    licenseB,
     compatible,
-    risk,
     reason,
   };
 }
 
 export function checkLicenseCompatibility(
   deps: ParsedDependency[],
-  projectLicense: string,
-  depLicenseMap: Record<string, string>
-): LicenseCompatibilitySummary {
-  const entries = deps.map((dep) => {
-    const depLicense = depLicenseMap[dep.name] ?? 'UNKNOWN';
+  projectLicense: string
+): LicenseCompatibilityReport {
+  const entries: LicenseCompatibilityEntry[] = deps.map((dep) => {
+    const depLicense = (dep as any).license ?? 'UNKNOWN';
     return buildCompatibilityEntry(dep, projectLicense, depLicense);
   });
 
   return {
-    total: entries.length,
-    incompatible: entries.filter((e) => !e.compatible).length,
-    highRisk: entries.filter((e) => e.risk === 'high').length,
     entries,
+    incompatibleCount: entries.filter((e) => !e.compatible).length,
+    checkedCount: entries.length,
   };
 }
